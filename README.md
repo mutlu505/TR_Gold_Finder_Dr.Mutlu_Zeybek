@@ -233,7 +233,7 @@ ax.set_aspect("equal")
 # ------------------------------------------------------------------
 # 7) MAP SCALE BAR
 # ------------------------------------------------------------------
-def add_scalebar(ax, length_km=100, location=(0.08, 0.06), fontsize=9):
+def add_scalebar(ax, length_km=100, location=(0.08, 1.50), fontsize=9):
     """
     Draw a horizontal scale bar on a lat/lon axes.
     length_km: total bar length in km
@@ -246,7 +246,7 @@ def add_scalebar(ax, length_km=100, location=(0.08, 0.06), fontsize=9):
 
     # Anchor in data coordinates
     x0 = ax.get_xlim()[0] + location[0] * (ax.get_xlim()[1] - ax.get_xlim()[0])
-    y0 = ax.get_ylim()[0] + location[1] * (ax.get_ylim()[1] - ax.get_ylim()[0])
+    y0 = ax.get_ylim()[0] + 0.07 * (ax.get_ylim()[1] - ax.get_ylim()[0])
 
     # Draw a 3-segment alternating black/white bar
     n_seg = 3
