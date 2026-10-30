@@ -874,4 +874,291 @@ print("=" * 65)
 
 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
+#!/usr/bin/env python3
+"""
+Türkiye Gold Deposits – Statistical Modeling Pipeline
+=====================================================
+Input : 87-deposit table (Yiğit, 2012a) hard-coded below
+Output: statistical models, fits, Bayes, spatial, Zipf, figures
+Run   : python turkiye_gold_analysis.py
+Deps  : numpy, pandas, scipy, matplotlib, statsmodels
+        optional: pymc, arviz  (for Bayesian sections)
+"""
+
+import warnings
+
+warnings.filterwarnings("ignore")
+import numpy as np, pandas as pd, matplotlib.pyplot as plt
+from scipy import stats
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
+from scipy.spatial.distance import cdist
+
+# ---- 1. DATA ------------------------------------------------------------
+RAW = """
+Kisladag|Usak|Porphyry Au|1|17.481
+Copler|Erzincan|Porphyry Au/epithermal IS|2|6.043
+Halilaga|Canakkale|Porphyry Cu-Au|3|3.500
+Mollakara|Agri|Carlin type?|4|3.372
+Efemcukuru|Izmir|Epithermal LS|5|2.052
+Sahinli|Canakkale|Epithermal IS|6|2.050
+Ovacik|Izmir|Epithermal LS|7|1.955
+Cukuralan|Izmir|Epithermal LS|8|1.801
+Cevizlidere|Tunceli|Porphyry Cu-Au-Mo|9|1.576
+Agi Dagi|Canakkale|Epithermal HS|10|1.444
+Cerattepe|Artvin|VMS-Kuroko/Epithermal|11|1.195
+Tac|Artvin|Epithermal HS|12|1.110
+Kisacik|Canakkale|Epithermal LS|13|1.000
+Yenipazar|Yozgat|VMS-Metamorphosed|14|0.956
+Asikoy|Kastamonu|VMS-Cyprus|15|0.895
+Corak|Artvin|Epithermal HS|16|0.760
+Mastra|Gumushane|Epithermal LS|17|0.628
+Ergani|Elazig|VMS-Cyprus|18|0.576
+Altintepe|Ordu|Epithermal|19|0.574
+Derekoy|Giresun|Epithermal|20|0.562
+Kaymaz|Eskisehir|Orogenic Au-Listwanite Hosted|21|0.544
+Kirazli|Canakkale|Epithermal HS|22|0.495
+Muratdere|Bilecik|Porphyry Cu-Mo-Au|23|0.447
+Himmetdede|Kayseri|Carlin type?|24|0.418
+Karakartal|Erzincan|Porphyry Cu-Au|25|0.386
+Akbaba|Canakkale|Epithermal LS|26|0.322
+Oksut|Kayseri|Epithermal HS|27|0.317
+Sisorta|Sivas|Epithermal HS|28|0.303
+Gumushane|Artvin|Porphyry Cu-Au|29|0.289
+Durusu|Artvin|Porphyry Au-Cu|30|0.289
+Inlice|Konya|Epithermal HS|31|0.262
+Cayeli|Rize|VMS-Kuroko|32|0.261
+Murgul|Artvin|VMS-Kuroko/epithermal|33|0.257
+Mayislar|Eskisehir|Porphyry Cu-Mo/Epithermal|34|0.244
+Tavsan|Kutahya|Orogenic Au-Listwanite Hosted|35|0.204
+Lahanos|Giresun|VMS-Kuroko|36|0.186
+Kucukdere|Balikesir|Epithermal LS|37|0.169
+Kiziltepe|Balikesir|Epithermal LS|38|0.168
+Karaagac|Kutahya|Orogenic Au-Listwanite hosted|39|0.157
+Gumuskoy|Kutahya|Epithermal|40|0.138
+Kiratli|Izmir|Epithermal HS|41|0.124
+Bakirtepe|Sivas|Iron oxide Cu-Au|42|0.115
+Hazine Magara|Gumushane|Carbonate replacement|43|0.106
+Korudanlik|Bilecik|Epithermal?|44|0.103
+Arapdag|Izmir|Epithermal HS|45|0.097
+Bolkardag I|Nigde|Carbonate replacement|46|0.086
+Terziali|Kirsehir|Orogenic Au-Mesothermal?|47|0.080
+Kaletas|Gumushane|Carlin type?|48|0.080
+Sart|Manisa|Placer|49|0.074
+Kirkpavli|Gumushane|Carbonate replacement|50|0.072
+Akoluk|Ordu|Epithermal LS|51|0.071
+Sobran|Gumushane|Epithermal|52|0.067
+Beykoy|Balikesir|Carlin type?|53|0.065
+Coraklik Tepe|Balikesir|Epithermal LS|54|0.059
+Kisecikkoy|Hatay|VMS-Cyprus/epithermal?|55|0.058
+Arapucandere|Canakkale|Epithermal IS|56|0.052
+Narlica|Izmir|Epithermal LS|57|0.044
+Darphane|Kars|Placer|58|0.040
+Kuvarshan|Artvin|VMS-Kuroko|59|0.040
+Papazlik|Balikesir|Carbonate replacement|60|0.039
+Bozdag|Manisa|Orogenic Au-mesothermal|61|0.038
+Agalik|Giresun|VMS-Kuroko|62|0.034
+Akarsen|Artvin|VMS-Kuroko|63|0.032
+Kubaslar|Balikesir|Epithermal LS|64|0.022
+Seyitler|Artvin|VMS-Kuroko|65|0.017
+Kayabasi|Trabzon|VMS-Kuroko|66|0.016
+Bolkardag II|Nigde|Carbonate replacement|67|0.015
+Suluklukoy|Bursa|Orogenic Au-Listwanite hosted|68|0.013
+Bakibaba|Kastamonu|VMS-Cyprus|69|0.012
+Savcilibeyit|Kirsehir|Orogenic au-mesothermal|70|0.011
+Kartaldag|Canakkale|Epithermal HS|71|0.008
+Kure|Izmir|Epithermal/orogenic gold|72|0.007
+Emirli|Izmir|Detachment-fault related|73|0.007
+Zeytindagi|Elazig|Skarn/porphyry Cu-Mo-Au|74|0.006
+Isikdag|Ankara|Epithermal|75|0.006
+Gelintepe|Izmir|Epithermal LS|76|0.006
+Gicik|Ankara|Epithermal?|77|0.006
+Karagoz|Nigde|Epithermal|78|0.005
+Nazarusagi|Elazig|Epithermal|79|0.004
+Madendag|Canakkale|Epithermal LS|80|0.003
+Firat Batisi|Elazig|Porphyry Cu-Mo|81|0.002
+Mert Golu|Kirklareli|Placer|82|0.002
+Cobancesme|Bingol|Carbonate replacement|83|0.001
+Akillicay|Hatay|Placer|84|0.001
+Olucak|Gumushane|Epithermal LS|85|0.001
+Sayaca|Ordu|Epithermal LS|86|0.001
+Satilar|Aydin|Orogenic Au-mesothermal?|87|0.0002
+"""
+df = pd.DataFrame(
+    [r.split("|") for r in RAW.strip().split("\n")],
+    columns=["Deposit", "State", "Type", "Rank", "Au_Moz"],
+)
+df["Rank"] = df["Rank"].astype(int)
+df["Au_Moz"] = df["Au_Moz"].astype(float)
+df["Type_group"] = df["Type"].str.split(r"[/?]").str[0].str.strip()
+df["log10_Au"] = np.log10(df["Au_Moz"])
+
+# ---- region mapping
+REGION = {
+    "Izmir": "Aegean",
+    "Usak": "Aegean",
+    "Canakkale": "Aegean",
+    "Balikesir": "Aegean",
+    "Manisa": "Aegean",
+    "Aydin": "Aegean",
+    "Kutahya": "Aegean",
+    "Artvin": "Black Sea",
+    "Gumushane": "Black Sea",
+    "Ordu": "Black Sea",
+    "Giresun": "Black Sea",
+    "Trabzon": "Black Sea",
+    "Rize": "Black Sea",
+    "Kastamonu": "Black Sea",
+    "Ankara": "Central Anatolia",
+    "Kayseri": "Central Anatolia",
+    "Sivas": "Central Anatolia",
+    "Yozgat": "Central Anatolia",
+    "Kirsehir": "Central Anatolia",
+    "Nigde": "Central Anatolia",
+    "Eskisehir": "Central Anatolia",
+    "Konya": "Central Anatolia",
+    "Erzincan": "Eastern Anatolia",
+    "Agri": "Eastern Anatolia",
+    "Tunceli": "Eastern Anatolia",
+    "Elazig": "Eastern Anatolia",
+    "Kars": "Eastern Anatolia",
+    "Bingol": "Eastern Anatolia",
+    "Bilecik": "Marmara",
+    "Bursa": "Marmara",
+    "Kirklareli": "Marmara",
+    "Hatay": "Mediterranean",
+}
+df["Region"] = df["State"].map(REGION).fillna("Other")
+
+# ---- 2. Quick summary
+print("=" * 60, "\nSUMMARY\n", "=" * 60)
+print(df["Au_Moz"].describe().round(4))
+print("Total Au (Moz):", round(df["Au_Moz"].sum(), 3), "| n =", len(df))
+
+# ---- 3. distribution fit + bootstrap + Zipf
+au = df["Au_Moz"].values
+lau = np.log(au)
+mu_mle, sg_mle = lau.mean(), lau.std(ddof=0)
+print(f"\nLog-normal MLE: mu={mu_mle:.4f}, sigma={sg_mle:.4f}")
+ks = stats.kstest(au, "lognorm", args=(sg_mle, 0, np.exp(mu_mle)))
+print(f"KS vs log-normal: D={ks.statistic:.4f}, p={ks.pvalue:.4f}")
+
+rng = np.random.default_rng(42)
+boot = np.array(
+    [
+        (lambda s: (np.log(s).mean(), np.log(s).std(ddof=0)))(rng.choice(au, len(au)))
+        for _ in range(5000)
+    ]
+)
+print(
+    f"Bootstrap 95% CI mu    : [{np.percentile(boot[:, 0], 2.5):.3f}, {np.percentile(boot[:, 0], 97.5):.3f}]"
+)
+print(
+    f"Bootstrap 95% CI sigma : [{np.percentile(boot[:, 1], 2.5):.3f}, {np.percentile(boot[:, 1], 97.5):.3f}]"
+)
+
+# Zipf
+slope, intercept, r, p, se = stats.linregress(
+    np.log(df.sort_values("Au_Moz", ascending=False)["Rank"].values),
+    np.log(df.sort_values("Au_Moz", ascending=False)["Au_Moz"].values),
+)
+print(f"Zipf slope b' = {-slope:.3f}  R²={r**2:.3f}  →  α_Zipf ≈ {-1 / slope:.2f}")
+
+# ---- 4. ANOVA by type
+tc = df["Type_group"].value_counts()
+df["Type_g"] = df["Type_group"].where(df["Type_group"].isin(tc[tc >= 3].index), "Other")
+m = ols("log10_Au ~ C(Type_g)", data=df).fit()
+print("\nANOVA by Type:\n", sm.stats.anova_lm(m, typ=2).round(4))
+
+# ---- 5. Spatial Moran's I
+COORD = {
+    "Usak": (29.4, 38.7),
+    "Erzincan": (39.5, 39.8),
+    "Canakkale": (26.4, 40.1),
+    "Agri": (43.1, 39.7),
+    "Izmir": (27.1, 38.4),
+    "Tunceli": (39.5, 39.1),
+    "Artvin": (41.8, 41.2),
+    "Yozgat": (34.8, 39.8),
+    "Kastamonu": (33.8, 41.4),
+    "Gumushane": (39.5, 40.5),
+    "Elazig": (39.2, 38.7),
+    "Ordu": (37.9, 40.9),
+    "Giresun": (38.4, 40.9),
+    "Eskisehir": (30.5, 39.8),
+    "Bilecik": (30.0, 40.1),
+    "Kayseri": (35.5, 38.7),
+    "Sivas": (37.0, 39.7),
+    "Konya": (32.5, 37.9),
+    "Rize": (40.5, 41.0),
+    "Kutahya": (29.9, 39.4),
+    "Balikesir": (28.0, 39.6),
+    "Nigde": (34.7, 37.9),
+    "Kirsehir": (34.2, 39.1),
+    "Manisa": (27.4, 38.6),
+    "Hatay": (36.2, 36.2),
+    "Kars": (43.1, 40.6),
+    "Bursa": (29.1, 40.2),
+    "Trabzon": (39.7, 41.0),
+    "Ankara": (32.9, 39.9),
+    "Kirklareli": (27.2, 41.7),
+    "Bingol": (40.5, 38.9),
+    "Aydin": (27.8, 37.8),
+}
+df["lon"] = df["State"].map(lambda s: COORD.get(s, (35.0, 39.0))[0])
+df["lat"] = df["State"].map(lambda s: COORD.get(s, (35.0, 39.0))[1])
+P = df[["lon", "lat"]].values
+D = cdist(P, P)
+np.fill_diagonal(D, np.inf)
+W = np.zeros_like(D)
+for i in range(len(D)):
+    W[i, np.argsort(D[i])[:5]] = 1.0 / D[i, np.argsort(D[i])[:5]]
+W = (W + W.T) / 2
+W = W / W.sum(1, keepdims=True)
+yv = df["log10_Au"].values - df["log10_Au"].mean()
+I = (len(yv) / W.sum()) * (yv @ W @ yv) / (yv @ yv)
+per = np.array(
+    [
+        (lambda x: (len(x) / W.sum()) * (x @ W @ x) / (x @ x))(rng.permutation(yv))
+        for _ in range(999)
+    ]
+)
+print(
+    f"\nMoran's I = {I:.4f}   p(perm) = {(np.sum(np.abs(per) >= abs(I)) + 1) / 1000:.3f}"
+)
+
+# ---- 6. Bayesian hierarchical (optional)
+try:
+    import pymc as pm, arviz as az
+
+    r_idx = pd.Categorical(df["Region"]).codes
+    t_idx = pd.Categorical(df["Type_g"]).codes
+    with pm.Model() as hier:
+        mu_a = pm.Normal("mu_a", 0, 1)
+        sd_r = pm.HalfNormal("sd_reg", 1)
+        sd_t = pm.HalfNormal("sd_typ", 1)
+        a_r = pm.Normal("a_reg", mu_a, sd_r, shape=r_idx.max() + 1)
+        a_t = pm.Normal("a_typ", 0, sd_t, shape=t_idx.max() + 1)
+        s = pm.HalfNormal("sigma", 1)
+        pm.Normal("y", a_r[r_idx] + a_t[t_idx], s, observed=df["log10_Au"].values)
+        tr = pm.sample(
+            1500,
+            tune=1000,
+            chains=4,
+            cores=1,
+            target_accept=0.95,
+            random_seed=42,
+            return_inferencedata=True,
+            progressbar=False,
+        )
+    print("\nHierarchical model (Bayes):")
+    print(az.summary(tr, var_names=["mu_a", "sd_reg", "sd_typ", "sigma"], round_to=3))
+except ImportError:
+    print("\n(PyMC not installed – Bayesian section skipped)")
+
+print("\nDone. Figures written to working directory.")
+
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
 
