@@ -339,3 +339,162 @@ plt.savefig("turkiye_gold_prospectivity.png", dpi=300)
 plt.show()
 print(f"Plotted {len(df)} deposits. Total Au resources: {df['au_moz'].sum():.2f} Moz")
 
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import stats
+
+# --- 1) Data entry ---------------------------------------------------------
+data = [
+    ("Kisladag", "Usak", "Porphyry Au", 1, 17.481),
+    ("Copler", "Erzincan", "Porphyry Au/epithermal IS", 2, 6.043),
+    ("Halilaga", "Canakkale", "Porphyry Cu-Au", 3, 3.500),
+    ("Mollakara", "Agri", "Carlin type?", 4, 3.372),
+    ("Efemcukuru", "Izmir", "Epithermal LS", 5, 2.052),
+    ("Sahinli", "Canakkale", "Epithermal IS", 6, 2.050),
+    ("Ovacik", "Izmir", "Epithermal LS", 7, 1.955),
+    ("Cukuralan", "Izmir", "Epithermal LS", 8, 1.801),
+    ("Cevizlidere", "Tunceli", "Porphyry Cu-Au-Mo", 9, 1.576),
+    ("Agi Dagi", "Canakkale", "Epithermal HS", 10, 1.444),
+    ("Cerattepe", "Artvin", "VMS-Kuroko/Epithermal", 11, 1.195),
+    ("Tac", "Artvin", "Epithermal HS", 12, 1.110),
+    ("Kisacik", "Canakkale", "Epithermal LS", 13, 1.000),
+    ("Yenipazar", "Yozgat", "VMS-Metamorphosed", 14, 0.956),
+    ("Asikoy", "Kastamonu", "VMS-Cyprus", 15, 0.895),
+    ("Corak", "Artvin", "Epithermal HS", 16, 0.760),
+    ("Mastra", "Gumushane", "Epithermal LS", 17, 0.628),
+    ("Ergani", "Elazig", "VMS-Cyprus", 18, 0.576),
+    ("Altintepe", "Ordu", "Epithermal", 19, 0.574),
+    ("Derekoy", "Giresun", "Epithermal", 20, 0.562),
+    ("Kaymaz", "Eskisehir", "Orogenic Au-Listwanite Hosted", 21, 0.544),
+    ("Kirazli", "Canakkale", "Epithermal HS", 22, 0.495),
+    ("Muratdere", "Bilecik", "Porphyry Cu-Mo-Au", 23, 0.447),
+    ("Himmetdede", "Kayseri", "Carlin type?", 24, 0.418),
+    ("Karakartal", "Erzincan", "Porphyry Cu-Au", 25, 0.386),
+    ("Akbaba", "Canakkale", "Epithermal LS", 26, 0.322),
+    ("Oksut", "Kayseri", "Epithermal HS", 27, 0.317),
+    ("Sisorta", "Sivas", "Epithermal HS", 28, 0.303),
+    ("Gumushane", "Artvin", "Porphyry Cu-Au", 29, 0.289),
+    ("Durusu", "Artvin", "Porphyry Au-Cu", 30, 0.289),
+    ("Inlice", "Konya", "Epithermal HS", 31, 0.262),
+    ("Cayeli", "Rize", "VMS-Kuroko", 32, 0.261),
+    ("Murgul", "Artvin", "VMS-Kuroko/epithermal", 33, 0.257),
+    ("Mayislar", "Eskisehir", "Porphyry Cu-Mo/Epithermal", 34, 0.244),
+    ("Tavsan", "Kutahya", "Orogenic Au-Listwanite Hosted", 35, 0.204),
+    ("Lahanos", "Giresun", "VMS-Kuroko", 36, 0.186),
+    ("Kucukdere", "Balikesir", "Epithermal LS", 37, 0.169),
+    ("Kiziltepe", "Balikesir", "Epithermal LS", 38, 0.168),
+    ("Karaagac", "Kutahya", "Orogenic Au-Listwanite hosted", 39, 0.157),
+    ("Gumuskoy", "Kutahya", "Epithermal", 40, 0.138),
+    ("Kiratli", "Izmir", "Epithermal HS", 41, 0.124),
+    ("Bakirtepe", "Sivas", "Iron oxide Cu-Au", 42, 0.115),
+    ("Hazine Magara", "Gumushane", "Carbonate replacement", 43, 0.106),
+    ("Korudanlik", "Bilecik", "Epithermal?", 44, 0.103),
+    ("Arapdag", "Izmir", "Epithermal HS", 45, 0.097),
+    ("Bolkardag I", "Nigde", "Carbonate replacement", 46, 0.086),
+    ("Terziali", "Kirsehir", "Orogenic Au-Mesothermal?", 47, 0.080),
+    ("Kaletas", "Gumushane", "Carlin type?", 48, 0.080),
+    ("Sart", "Manisa", "Placer", 49, 0.074),
+    ("Kirkpavli", "Gumushane", "Carbonate replacement", 50, 0.072),
+    ("Akoluk", "Ordu", "Epithermal LS", 51, 0.071),
+    ("Sobran", "Gumushane", "Epithermal", 52, 0.067),
+    ("Beykoy", "Balikesir", "Carlin type?", 53, 0.065),
+    ("Coraklik Tepe", "Balikesir", "Epithermal LS", 54, 0.059),
+    ("Kisecikkoy", "Hatay", "VMS-Cyprus/epithermal?", 55, 0.058),
+    ("Arapucandere", "Canakkale", "Epithermal IS", 56, 0.052),
+    ("Narlica", "Izmir", "Epithermal LS", 57, 0.044),
+    ("Darphane", "Kars", "Placer", 58, 0.040),
+    ("Kuvarshan", "Artvin", "VMS-Kuroko", 59, 0.040),
+    ("Papazlik", "Balikesir", "Carbonate replacement", 60, 0.039),
+    ("Bozdag", "Manisa", "Orogenic Au-mesothermal", 61, 0.038),
+    ("Agalik", "Giresun", "VMS-Kuroko", 62, 0.034),
+    ("Akarsen", "Artvin", "VMS-Kuroko", 63, 0.032),
+    ("Kubaslar", "Balikesir", "Epithermal LS", 64, 0.022),
+    ("Seyitler", "Artvin", "VMS-Kuroko", 65, 0.017),
+    ("Kayabasi", "Trabzon", "VMS-Kuroko", 66, 0.016),
+    ("Bolkardag II", "Nigde", "Carbonate replacement", 67, 0.015),
+    ("Suluklukoy", "Bursa", "Orogenic Au-Listwanite hosted", 68, 0.013),
+    ("Bakibaba", "Kastamonu", "VMS-Cyprus", 69, 0.012),
+    ("Savcilibeyit", "Kirsehir", "Orogenic au-mesothermal", 70, 0.011),
+    ("Kartaldag", "Canakkale", "Epithermal HS", 71, 0.008),
+    ("Kure", "Izmir", "Epithermal/orogenic gold", 72, 0.007),
+    ("Emirli", "Izmir", "Detachment-fault related", 73, 0.007),
+    ("Zeytindagi", "Elazig", "Skarn/porphyry Cu-Mo-Au", 74, 0.006),
+    ("Isikdag", "Ankara", "Epithermal", 75, 0.006),
+    ("Gelintepe", "Izmir", "Epithermal LS", 76, 0.006),
+    ("Gicik", "Ankara", "Epithermal?", 77, 0.006),
+    ("Karagoz", "Nigde", "Epithermal", 78, 0.005),
+    ("Nazarusagi", "Elazig", "Epithermal", 79, 0.004),
+    ("Madendag", "Canakkale", "Epithermal LS", 80, 0.003),
+    ("Firat Batisi", "Elazig", "Porphyry Cu-Mo", 81, 0.002),
+    ("Mert Golu", "Kirklareli", "Placer", 82, 0.002),
+    ("Cobancesme", "Bingol", "Carbonate replacement", 83, 0.001),
+    ("Akillicay", "Hatay", "Placer", 84, 0.001),
+    ("Olucak", "Gumushane", "Epithermal LS", 85, 0.001),
+    ("Sayaca", "Ordu", "Epithermal LS", 86, 0.001),
+    ("Satilar", "Aydin", "Orogenic Au-mesothermal?", 87, 0.0002),
+]
+df = pd.DataFrame(data, columns=["Deposit", "State", "Type", "Rank", "Au_Moz"])
+df["Type_group"] = df["Type"].str.split(r"[/?]").str[0].str.strip()
+
+# --- 2) Summary statistics -------------------------------------------------
+print("=== Summary statistics ===")
+print(df["Au_Moz"].describe())
+print(
+    "\nSkewness:",
+    round(stats.skew(df["Au_Moz"]), 3),
+    "| Kurtosis:",
+    round(stats.kurtosis(df["Au_Moz"]), 3),
+)
+print("Total Au (Moz):", round(df["Au_Moz"].sum(), 3))
+print("Shapiro-Wilk (normality):", stats.shapiro(df["Au_Moz"]))
+
+# --- 3) Distribution fits --------------------------------------------------
+log_au = np.log10(df["Au_Moz"])
+print("\n=== Log10(Au) statistics ===")
+print(log_au.describe())
+print("Shapiro-Wilk on log10(Au):", stats.shapiro(log_au))
+
+# --- 4) Rank vs Au regression ----------------------------------------------
+slope, intercept, r, p, se = stats.linregress(df["Rank"], log_au)
+print(
+    f"\nRank vs log10(Au): slope={slope:.4f}, intercept={intercept:.4f}, R²={r**2:.4f}, p={p:.2e}"
+)
+
+# --- 5) By deposit type ----------------------------------------------------
+print("\n=== Top deposit types by total Au ===")
+grouped = (
+    df.groupby("Type_group")["Au_Moz"]
+    .agg(["count", "sum", "mean"])
+    .sort_values("sum", ascending=False)
+)
+print(grouped.head(10).round(3))
+
+# --- 6) Plots --------------------------------------------------------------
+fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+axes[0].hist(df["Au_Moz"], bins=30, color="steelblue", edgecolor="k")
+axes[0].set_title("Au resources (Moz) – raw")
+axes[0].set_xlabel("Au (Moz)")
+axes[1].hist(log_au, bins=30, color="darkorange", edgecolor="k")
+axes[1].set_title("log10(Au) – log-normal check")
+axes[1].set_xlabel("log10(Au Moz)")
+plt.tight_layout()
+plt.savefig("au_distribution.png", dpi=300)
+
+plt.figure(figsize=(6, 4))
+plt.scatter(df["Rank"], log_au, s=20)
+plt.plot(df["Rank"], intercept + slope * df["Rank"], "r-", label=f"R²={r**2:.2f}")
+plt.xlabel("Rank")
+plt.ylabel("log10(Au Moz)")
+plt.legend()
+plt.title("Rank vs log10(Au)")
+plt.tight_layout()
+plt.savefig("au_vs_rank.png", dpi=300)
+
+# --- 7) Top-10 Pareto check ------------------------------------------------
+top10 = df.nlargest(10, "Au_Moz")["Au_Moz"].sum()
+print(f"\nTop-10 deposits hold {top10 / df['Au_Moz'].sum() * 100:.1f}% of total Au")
+
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
