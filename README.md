@@ -176,7 +176,7 @@ fig, ax = plt.subplots(figsize=(13, 7))
 
 # 6a) KDE prospectivity surface
 cs = ax.contourf(gx, gy, gz, levels=25, cmap="YlOrRd", alpha=0.85)
-cb = plt.colorbar(cs, ax=ax, label="Prospectivity (KDE)", shrink=0.85)
+cb = plt.colorbar(cs, ax=ax, label="Prospectivity (KDE)", shrink=0.52)
 
 # 6b) Province boundaries
 if provinces is not None:
