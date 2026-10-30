@@ -498,3 +498,245 @@ top10 = df.nlargest(10, "Au_Moz")["Au_Moz"].sum()
 print(f"\nTop-10 deposits hold {top10 / df['Au_Moz'].sum() * 100:.1f}% of total Au")
 
 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+import pandas as pd
+import numpy as np
+import matplotlib
+
+matplotlib.use("Agg")  # non-interactive backend (safe for scripts/servers)
+import matplotlib.pyplot as plt
+from scipy import stats
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
+
+# ============================================================
+# 0) DATA ENTRY (all 87 deposits)
+# ============================================================
+data = [
+    ("Kisladag", "Usak", "Porphyry Au", 1, 17.481),
+    ("Copler", "Erzincan", "Porphyry Au/epithermal IS", 2, 6.043),
+    ("Halilaga", "Canakkale", "Porphyry Cu-Au", 3, 3.500),
+    ("Mollakara", "Agri", "Carlin type?", 4, 3.372),
+    ("Efemcukuru", "Izmir", "Epithermal LS", 5, 2.052),
+    ("Sahinli", "Canakkale", "Epithermal IS", 6, 2.050),
+    ("Ovacik", "Izmir", "Epithermal LS", 7, 1.955),
+    ("Cukuralan", "Izmir", "Epithermal LS", 8, 1.801),
+    ("Cevizlidere", "Tunceli", "Porphyry Cu-Au-Mo", 9, 1.576),
+    ("Agi Dagi", "Canakkale", "Epithermal HS", 10, 1.444),
+    ("Cerattepe", "Artvin", "VMS-Kuroko/Epithermal", 11, 1.195),
+    ("Tac", "Artvin", "Epithermal HS", 12, 1.110),
+    ("Kisacik", "Canakkale", "Epithermal LS", 13, 1.000),
+    ("Yenipazar", "Yozgat", "VMS-Metamorphosed", 14, 0.956),
+    ("Asikoy", "Kastamonu", "VMS-Cyprus", 15, 0.895),
+    ("Corak", "Artvin", "Epithermal HS", 16, 0.760),
+    ("Mastra", "Gumushane", "Epithermal LS", 17, 0.628),
+    ("Ergani", "Elazig", "VMS-Cyprus", 18, 0.576),
+    ("Altintepe", "Ordu", "Epithermal", 19, 0.574),
+    ("Derekoy", "Giresun", "Epithermal", 20, 0.562),
+    ("Kaymaz", "Eskisehir", "Orogenic Au-Listwanite Hosted", 21, 0.544),
+    ("Kirazli", "Canakkale", "Epithermal HS", 22, 0.495),
+    ("Muratdere", "Bilecik", "Porphyry Cu-Mo-Au", 23, 0.447),
+    ("Himmetdede", "Kayseri", "Carlin type?", 24, 0.418),
+    ("Karakartal", "Erzincan", "Porphyry Cu-Au", 25, 0.386),
+    ("Akbaba", "Canakkale", "Epithermal LS", 26, 0.322),
+    ("Oksut", "Kayseri", "Epithermal HS", 27, 0.317),
+    ("Sisorta", "Sivas", "Epithermal HS", 28, 0.303),
+    ("Gumushane", "Artvin", "Porphyry Cu-Au", 29, 0.289),
+    ("Durusu", "Artvin", "Porphyry Au-Cu", 30, 0.289),
+    ("Inlice", "Konya", "Epithermal HS", 31, 0.262),
+    ("Cayeli", "Rize", "VMS-Kuroko", 32, 0.261),
+    ("Murgul", "Artvin", "VMS-Kuroko/epithermal", 33, 0.257),
+    ("Mayislar", "Eskisehir", "Porphyry Cu-Mo/Epithermal", 34, 0.244),
+    ("Tavsan", "Kutahya", "Orogenic Au-Listwanite Hosted", 35, 0.204),
+    ("Lahanos", "Giresun", "VMS-Kuroko", 36, 0.186),
+    ("Kucukdere", "Balikesir", "Epithermal LS", 37, 0.169),
+    ("Kiziltepe", "Balikesir", "Epithermal LS", 38, 0.168),
+    ("Karaagac", "Kutahya", "Orogenic Au-Listwanite hosted", 39, 0.157),
+    ("Gumuskoy", "Kutahya", "Epithermal", 40, 0.138),
+    ("Kiratli", "Izmir", "Epithermal HS", 41, 0.124),
+    ("Bakirtepe", "Sivas", "Iron oxide Cu-Au", 42, 0.115),
+    ("Hazine Magara", "Gumushane", "Carbonate replacement", 43, 0.106),
+    ("Korudanlik", "Bilecik", "Epithermal?", 44, 0.103),
+    ("Arapdag", "Izmir", "Epithermal HS", 45, 0.097),
+    ("Bolkardag I", "Nigde", "Carbonate replacement", 46, 0.086),
+    ("Terziali", "Kirsehir", "Orogenic Au-Mesothermal?", 47, 0.080),
+    ("Kaletas", "Gumushane", "Carlin type?", 48, 0.080),
+    ("Sart", "Manisa", "Placer", 49, 0.074),
+    ("Kirkpavli", "Gumushane", "Carbonate replacement", 50, 0.072),
+    ("Akoluk", "Ordu", "Epithermal LS", 51, 0.071),
+    ("Sobran", "Gumushane", "Epithermal", 52, 0.067),
+    ("Beykoy", "Balikesir", "Carlin type?", 53, 0.065),
+    ("Coraklik Tepe", "Balikesir", "Epithermal LS", 54, 0.059),
+    ("Kisecikkoy", "Hatay", "VMS-Cyprus/epithermal?", 55, 0.058),
+    ("Arapucandere", "Canakkale", "Epithermal IS", 56, 0.052),
+    ("Narlica", "Izmir", "Epithermal LS", 57, 0.044),
+    ("Darphane", "Kars", "Placer", 58, 0.040),
+    ("Kuvarshan", "Artvin", "VMS-Kuroko", 59, 0.040),
+    ("Papazlik", "Balikesir", "Carbonate replacement", 60, 0.039),
+    ("Bozdag", "Manisa", "Orogenic Au-mesothermal", 61, 0.038),
+    ("Agalik", "Giresun", "VMS-Kuroko", 62, 0.034),
+    ("Akarsen", "Artvin", "VMS-Kuroko", 63, 0.032),
+    ("Kubaslar", "Balikesir", "Epithermal LS", 64, 0.022),
+    ("Seyitler", "Artvin", "VMS-Kuroko", 65, 0.017),
+    ("Kayabasi", "Trabzon", "VMS-Kuroko", 66, 0.016),
+    ("Bolkardag II", "Nigde", "Carbonate replacement", 67, 0.015),
+    ("Suluklukoy", "Bursa", "Orogenic Au-Listwanite hosted", 68, 0.013),
+    ("Bakibaba", "Kastamonu", "VMS-Cyprus", 69, 0.012),
+    ("Savcilibeyit", "Kirsehir", "Orogenic au-mesothermal", 70, 0.011),
+    ("Kartaldag", "Canakkale", "Epithermal HS", 71, 0.008),
+    ("Kure", "Izmir", "Epithermal/orogenic gold", 72, 0.007),
+    ("Emirli", "Izmir", "Detachment-fault related", 73, 0.007),
+    ("Zeytindagi", "Elazig", "Skarn/porphyry Cu-Mo-Au", 74, 0.006),
+    ("Isikdag", "Ankara", "Epithermal", 75, 0.006),
+    ("Gelintepe", "Izmir", "Epithermal LS", 76, 0.006),
+    ("Gicik", "Ankara", "Epithermal?", 77, 0.006),
+    ("Karagoz", "Nigde", "Epithermal", 78, 0.005),
+    ("Nazarusagi", "Elazig", "Epithermal", 79, 0.004),
+    ("Madendag", "Canakkale", "Epithermal LS", 80, 0.003),
+    ("Firat Batisi", "Elazig", "Porphyry Cu-Mo", 81, 0.002),
+    ("Mert Golu", "Kirklareli", "Placer", 82, 0.002),
+    ("Cobancesme", "Bingol", "Carbonate replacement", 83, 0.001),
+    ("Akillicay", "Hatay", "Placer", 84, 0.001),
+    ("Olucak", "Gumushane", "Epithermal LS", 85, 0.001),
+    ("Sayaca", "Ordu", "Epithermal LS", 86, 0.001),
+    ("Satilar", "Aydin", "Orogenic Au-mesothermal?", 87, 0.0002),
+]
+df = pd.DataFrame(data, columns=["Deposit", "State", "Type", "Rank", "Au_Moz"])
+df["Type_group"] = df["Type"].str.split(r"[/?]").str[0].str.strip()
+
+au = df["Au_Moz"].values
+log_au = np.log(au)
+
+# ============================================================
+# 1) LOG-NORMAL MLE FIT
+# ============================================================
+print("=" * 60)
+print("1) LOG-NORMAL MLE FIT (Au in Moz)")
+print("=" * 60)
+mu_mle = log_au.mean()
+sigma_mle = log_au.std(ddof=0)
+print(f"mu_MLE    = {mu_mle:.4f}")
+print(f"sigma_MLE = {sigma_mle:.4f}")
+print(f"Median (exp(mu)) = {np.exp(mu_mle):.4f} Moz")
+print(f"Mean   (exp(mu+σ²/2)) = {np.exp(mu_mle + sigma_mle**2 / 2):.4f} Moz")
+
+ks_stat, ks_p = stats.kstest(au, "lognorm", args=(sigma_mle, 0, np.exp(mu_mle)))
+print(f"KS test vs fitted log-normal: D={ks_stat:.4f}, p={ks_p:.4f}")
+
+wb_params = stats.weibull_min.fit(au, floc=0)
+ks_wb = stats.kstest(au, "weibull_min", args=wb_params)
+print(f"Weibull fit params (c, loc, scale) = {tuple(round(p, 4) for p in wb_params)}")
+print(f"KS test vs Weibull: D={ks_wb.statistic:.4f}, p={ks_wb.pvalue:.4f}")
+
+
+def aic(loglik, k):
+    return 2 * k - 2 * loglik
+
+
+ll_ln = np.sum(stats.lognorm.logpdf(au, sigma_mle, 0, np.exp(mu_mle)))
+ll_wb = np.sum(stats.weibull_min.logpdf(au, *wb_params))
+print(f"AIC log-normal = {aic(ll_ln, 2):.2f}")
+print(f"AIC Weibull    = {aic(ll_wb, 3):.2f}")
+
+# ============================================================
+# 2) PARETO TAIL ANALYSIS
+# ============================================================
+print("\n" + "=" * 60)
+print("2) PARETO TAIL ANALYSIS")
+print("=" * 60)
+threshold = np.percentile(au, 80)
+tail = au[au >= threshold]
+print(f"Tail threshold (80th pct) = {threshold:.4f} Moz, n_tail = {len(tail)}")
+alpha_hat = len(tail) / np.sum(np.log(tail / threshold))
+print(f"Pareto alpha (tail index) = {alpha_hat:.4f}")
+print(
+    "  alpha < 2 → infinite variance (heavy tail)"
+    if alpha_hat < 2
+    else "  alpha >= 2 → finite variance"
+)
+
+# Hill plot
+sorted_au = np.sort(au)[::-1]
+k_vals = np.arange(5, len(sorted_au))
+hill = k_vals / np.sum(
+    np.log(sorted_au[: len(k_vals)][:, None] / sorted_au[k_vals][:, None]), axis=1
+)
+plt.figure(figsize=(7, 4))
+plt.plot(k_vals, hill, "b-")
+plt.axhline(alpha_hat, color="r", ls="--", label=f"α={alpha_hat:.2f} (top 20%)")
+plt.xlabel("k (number of top order statistics)")
+plt.ylabel("Hill estimator α̂")
+plt.title("Hill plot – tail index stability")
+plt.legend()
+plt.tight_layout()
+plt.savefig("hill_plot.png", dpi=300)
+
+# ============================================================
+# 3) ANOVA ACROSS DEPOSIT TYPES
+# ============================================================
+print("\n" + "=" * 60)
+print("3) ANOVA ACROSS DEPOSIT TYPES (log10 Au)")
+print("=" * 60)
+df["log10_Au"] = np.log10(df["Au_Moz"])
+type_counts = df["Type_group"].value_counts()
+df["Type_grp"] = df["Type_group"].where(
+    df["Type_group"].isin(type_counts[type_counts >= 3].index), "Other"
+)
+print("Group sizes:\n", df["Type_grp"].value_counts(), "\n")
+
+model = ols("log10_Au ~ C(Type_grp)", data=df).fit()
+anova_table = sm.stats.anova_lm(model, typ=2)
+print(anova_table.round(4))
+
+ss_between = anova_table.loc["C(Type_grp)", "sum_sq"]
+ss_total = anova_table["sum_sq"].sum()
+eta2 = ss_between / ss_total
+print(f"\nEta² (effect size) = {eta2:.4f}  ({eta2 * 100:.1f}% of variance explained)")
+
+tukey = pairwise_tukeyhsd(df["log10_Au"], df["Type_grp"], alpha=0.05)
+print("\nTukey HSD post-hoc:\n", tukey.summary())
+
+# ============================================================
+# 4) Q-Q PLOTS
+# ============================================================
+fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+stats.probplot(au, dist="lognorm", sparams=(sigma_mle, 0, np.exp(mu_mle)), plot=axes[0])
+axes[0].set_title("Q-Q: log-normal fit")
+stats.probplot(au, dist="weibull_min", sparams=(wb_params[0], 0), plot=axes[1])
+axes[1].set_title("Q-Q: Weibull fit")
+plt.tight_layout()
+plt.savefig("qq_plots.png", dpi=300)
+
+# ============================================================
+# 5) BOXPLOT BY TYPE
+# ============================================================
+plt.figure(figsize=(10, 5))
+order = df.groupby("Type_grp")["log10_Au"].median().sort_values(ascending=False).index
+df.boxplot(column="log10_Au", by="Type_grp", ax=plt.gca(), positions=range(len(order)))
+plt.title("log10(Au Moz) by deposit type")
+plt.suptitle("")
+plt.ylabel("log10(Au Moz)")
+plt.xticks(range(len(order)), order, rotation=45, ha="right")
+plt.tight_layout()
+plt.savefig("anova_boxplot.png", dpi=300)
+
+# ============================================================
+# 6) SUMMARY
+# ============================================================
+print("\n" + "=" * 60)
+print("SUMMARY OF MODEL CHOICE")
+print("=" * 60)
+best = "log-normal" if aic(ll_ln, 2) < aic(ll_wb, 3) else "Weibull"
+print(f"Best global fit  : {best}")
+tail_msg = (
+    "heavy tail, finite mean & variance"
+    if alpha_hat >= 2
+    else "heavy tail, finite mean, infinite variance"
+)
+print(f"Tail behaviour   : Pareto α = {alpha_hat:.3f} ({tail_msg})")
+print(
+    f"Type effect      : F-test p = {anova_table.loc['C(Type_grp)', 'PR(>F)']:.2e}, η² = {eta2:.3f}"
+)
+
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
