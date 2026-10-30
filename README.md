@@ -740,3 +740,277 @@ print(
 )
 
 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+import pandas as pd
+import numpy as np
+import matplotlib
+
+matplotlib.use("Agg")  # headless-safe
+import matplotlib.pyplot as plt
+from scipy import stats, optimize
+
+# ============================================================
+# 0) DATA ENTRY (all 87 deposits from Table 1)
+# ============================================================
+data = [
+    ("Kisladag", "Usak", "Porphyry Au", 1, 17.481),
+    ("Copler", "Erzincan", "Porphyry Au/epithermal IS", 2, 6.043),
+    ("Halilaga", "Canakkale", "Porphyry Cu-Au", 3, 3.500),
+    ("Mollakara", "Agri", "Carlin type?", 4, 3.372),
+    ("Efemcukuru", "Izmir", "Epithermal LS", 5, 2.052),
+    ("Sahinli", "Canakkale", "Epithermal IS", 6, 2.050),
+    ("Ovacik", "Izmir", "Epithermal LS", 7, 1.955),
+    ("Cukuralan", "Izmir", "Epithermal LS", 8, 1.801),
+    ("Cevizlidere", "Tunceli", "Porphyry Cu-Au-Mo", 9, 1.576),
+    ("Agi Dagi", "Canakkale", "Epithermal HS", 10, 1.444),
+    ("Cerattepe", "Artvin", "VMS-Kuroko/Epithermal", 11, 1.195),
+    ("Tac", "Artvin", "Epithermal HS", 12, 1.110),
+    ("Kisacik", "Canakkale", "Epithermal LS", 13, 1.000),
+    ("Yenipazar", "Yozgat", "VMS-Metamorphosed", 14, 0.956),
+    ("Asikoy", "Kastamonu", "VMS-Cyprus", 15, 0.895),
+    ("Corak", "Artvin", "Epithermal HS", 16, 0.760),
+    ("Mastra", "Gumushane", "Epithermal LS", 17, 0.628),
+    ("Ergani", "Elazig", "VMS-Cyprus", 18, 0.576),
+    ("Altintepe", "Ordu", "Epithermal", 19, 0.574),
+    ("Derekoy", "Giresun", "Epithermal", 20, 0.562),
+    ("Kaymaz", "Eskisehir", "Orogenic Au-Listwanite Hosted", 21, 0.544),
+    ("Kirazli", "Canakkale", "Epithermal HS", 22, 0.495),
+    ("Muratdere", "Bilecik", "Porphyry Cu-Mo-Au", 23, 0.447),
+    ("Himmetdede", "Kayseri", "Carlin type?", 24, 0.418),
+    ("Karakartal", "Erzincan", "Porphyry Cu-Au", 25, 0.386),
+    ("Akbaba", "Canakkale", "Epithermal LS", 26, 0.322),
+    ("Oksut", "Kayseri", "Epithermal HS", 27, 0.317),
+    ("Sisorta", "Sivas", "Epithermal HS", 28, 0.303),
+    ("Gumushane", "Artvin", "Porphyry Cu-Au", 29, 0.289),
+    ("Durusu", "Artvin", "Porphyry Au-Cu", 30, 0.289),
+    ("Inlice", "Konya", "Epithermal HS", 31, 0.262),
+    ("Cayeli", "Rize", "VMS-Kuroko", 32, 0.261),
+    ("Murgul", "Artvin", "VMS-Kuroko/epithermal", 33, 0.257),
+    ("Mayislar", "Eskisehir", "Porphyry Cu-Mo/Epithermal", 34, 0.244),
+    ("Tavsan", "Kutahya", "Orogenic Au-Listwanite Hosted", 35, 0.204),
+    ("Lahanos", "Giresun", "VMS-Kuroko", 36, 0.186),
+    ("Kucukdere", "Balikesir", "Epithermal LS", 37, 0.169),
+    ("Kiziltepe", "Balikesir", "Epithermal LS", 38, 0.168),
+    ("Karaagac", "Kutahya", "Orogenic Au-Listwanite hosted", 39, 0.157),
+    ("Gumuskoy", "Kutahya", "Epithermal", 40, 0.138),
+    ("Kiratli", "Izmir", "Epithermal HS", 41, 0.124),
+    ("Bakirtepe", "Sivas", "Iron oxide Cu-Au", 42, 0.115),
+    ("Hazine Magara", "Gumushane", "Carbonate replacement", 43, 0.106),
+    ("Korudanlik", "Bilecik", "Epithermal?", 44, 0.103),
+    ("Arapdag", "Izmir", "Epithermal HS", 45, 0.097),
+    ("Bolkardag I", "Nigde", "Carbonate replacement", 46, 0.086),
+    ("Terziali", "Kirsehir", "Orogenic Au-Mesothermal?", 47, 0.080),
+    ("Kaletas", "Gumushane", "Carlin type?", 48, 0.080),
+    ("Sart", "Manisa", "Placer", 49, 0.074),
+    ("Kirkpavli", "Gumushane", "Carbonate replacement", 50, 0.072),
+    ("Akoluk", "Ordu", "Epithermal LS", 51, 0.071),
+    ("Sobran", "Gumushane", "Epithermal", 52, 0.067),
+    ("Beykoy", "Balikesir", "Carlin type?", 53, 0.065),
+    ("Coraklik Tepe", "Balikesir", "Epithermal LS", 54, 0.059),
+    ("Kisecikkoy", "Hatay", "VMS-Cyprus/epithermal?", 55, 0.058),
+    ("Arapucandere", "Canakkale", "Epithermal IS", 56, 0.052),
+    ("Narlica", "Izmir", "Epithermal LS", 57, 0.044),
+    ("Darphane", "Kars", "Placer", 58, 0.040),
+    ("Kuvarshan", "Artvin", "VMS-Kuroko", 59, 0.040),
+    ("Papazlik", "Balikesir", "Carbonate replacement", 60, 0.039),
+    ("Bozdag", "Manisa", "Orogenic Au-mesothermal", 61, 0.038),
+    ("Agalik", "Giresun", "VMS-Kuroko", 62, 0.034),
+    ("Akarsen", "Artvin", "VMS-Kuroko", 63, 0.032),
+    ("Kubaslar", "Balikesir", "Epithermal LS", 64, 0.022),
+    ("Seyitler", "Artvin", "VMS-Kuroko", 65, 0.017),
+    ("Kayabasi", "Trabzon", "VMS-Kuroko", 66, 0.016),
+    ("Bolkardag II", "Nigde", "Carbonate replacement", 67, 0.015),
+    ("Suluklukoy", "Bursa", "Orogenic Au-Listwanite hosted", 68, 0.013),
+    ("Bakibaba", "Kastamonu", "VMS-Cyprus", 69, 0.012),
+    ("Savcilibeyit", "Kirsehir", "Orogenic au-mesothermal", 70, 0.011),
+    ("Kartaldag", "Canakkale", "Epithermal HS", 71, 0.008),
+    ("Kure", "Izmir", "Epithermal/orogenic gold", 72, 0.007),
+    ("Emirli", "Izmir", "Detachment-fault related", 73, 0.007),
+    ("Zeytindagi", "Elazig", "Skarn/porphyry Cu-Mo-Au", 74, 0.006),
+    ("Isikdag", "Ankara", "Epithermal", 75, 0.006),
+    ("Gelintepe", "Izmir", "Epithermal LS", 76, 0.006),
+    ("Gicik", "Ankara", "Epithermal?", 77, 0.006),
+    ("Karagoz", "Nigde", "Epithermal", 78, 0.005),
+    ("Nazarusagi", "Elazig", "Epithermal", 79, 0.004),
+    ("Madendag", "Canakkale", "Epithermal LS", 80, 0.003),
+    ("Firat Batisi", "Elazig", "Porphyry Cu-Mo", 81, 0.002),
+    ("Mert Golu", "Kirklareli", "Placer", 82, 0.002),
+    ("Cobancesme", "Bingol", "Carbonate replacement", 83, 0.001),
+    ("Akillicay", "Hatay", "Placer", 84, 0.001),
+    ("Olucak", "Gumushane", "Epithermal LS", 85, 0.001),
+    ("Sayaca", "Ordu", "Epithermal LS", 86, 0.001),
+    ("Satilar", "Aydin", "Orogenic Au-mesothermal?", 87, 0.0002),
+]
+df = pd.DataFrame(data, columns=["Deposit", "State", "Type", "Rank", "Au_Moz"])
+df["Type_group"] = df["Type"].str.split(r"[/?]").str[0].str.strip()
+df["log10_Au"] = np.log10(df["Au_Moz"])
+
+au = df["Au_Moz"].values
+log_au = np.log(au)
+n = len(au)
+rng = np.random.default_rng(42)
+
+# ============================================================
+# 1) BOOTSTRAP CONFIDENCE INTERVALS
+# ============================================================
+print("=" * 65)
+print("1) BOOTSTRAP CIs (10,000 resamples, percentile method)")
+print("=" * 65)
+B = 10_000
+boot_mu, boot_sigma, boot_alpha = [], [], []
+xmin_fixed = np.percentile(au, 80)
+
+for _ in range(B):
+    s = rng.choice(au, size=n, replace=True)
+    ls = np.log(s)
+    boot_mu.append(ls.mean())
+    boot_sigma.append(ls.std(ddof=0))
+    tail = s[s >= xmin_fixed]
+    if len(tail) >= 3 and np.all(tail > 0):
+        boot_alpha.append(len(tail) / np.sum(np.log(tail / xmin_fixed)))
+    else:
+        boot_alpha.append(np.nan)
+
+
+def ci(arr, level=0.95):
+    a = np.array(arr)
+    a = a[~np.isnan(a)]
+    lo, hi = np.percentile(a, [(1 - level) / 2 * 100, (1 + level) / 2 * 100])
+    return lo, hi
+
+
+for name, arr in [
+    ("mu (log-mean)", boot_mu),
+    ("sigma (log-sd)", boot_sigma),
+    ("Pareto alpha", boot_alpha),
+]:
+    lo, hi = ci(arr)
+    print(f"{name:15s}: point={np.nanmean(arr):.4f}  95% CI=[{lo:.4f}, {hi:.4f}]")
+
+boot_median = np.exp(boot_mu)
+boot_mean = np.exp(np.array(boot_mu) + np.array(boot_sigma) ** 2 / 2)
+for name, arr in [("Median Au (Moz)", boot_median), ("Mean Au (Moz)", boot_mean)]:
+    lo, hi = ci(arr)
+    print(f"{name:15s}: point={np.nanmean(arr):.4f}  95% CI=[{lo:.4f}, {hi:.4f}]")
+
+# ============================================================
+# 2) COMBINED LOG-NORMAL + PARETO (LNP) TAIL MODEL
+# ============================================================
+print("\n" + "=" * 65)
+print("2) COMBINED LOG-NORMAL BODY + PARETO TAIL (LNP)")
+print("=" * 65)
+
+
+def lnp_nll(params, x):
+    mu, sigma, alpha, u = params
+    if sigma <= 0 or alpha <= 0 or u <= 0:
+        return 1e10
+    body = x[x < u]
+    tail = x[x >= u]
+    if len(body) < 2 or len(tail) < 2:
+        return 1e10
+    cdf_u = stats.lognorm.cdf(u, sigma, 0, np.exp(mu))
+    if cdf_u <= 0 or cdf_u >= 1:
+        return 1e10
+    ll_body = np.sum(stats.lognorm.logpdf(body, sigma, 0, np.exp(mu)) - np.log(cdf_u))
+    ll_tail = np.sum(stats.pareto.logpdf(tail, alpha, scale=u))
+    return -(ll_body + ll_tail)
+
+
+x0 = [log_au.mean(), log_au.std(ddof=0), 1.5, np.percentile(au, 75)]
+bounds = [
+    (-5, 5),
+    (0.1, 3),
+    (0.5, 5),
+    (float(np.percentile(au, 50)), float(np.percentile(au, 95))),
+]
+res = optimize.minimize(lnp_nll, x0, args=(au,), method="L-BFGS-B", bounds=bounds)
+mu_h, sig_h, alpha_h, u_h = res.x
+print(f"mu     = {mu_h:.4f}")
+print(f"sigma  = {sig_h:.4f}")
+print(f"alpha  = {alpha_h:.4f}   (tail index)")
+print(f"u      = {u_h:.4f} Moz (body/tail threshold)")
+print(f"NLL    = {res.fun:.2f}   |  AIC = {2 * 4 - 2 * (-res.fun):.2f}")
+print(f"n_body = {(au < u_h).sum()},  n_tail = {(au >= u_h).sum()}")
+
+ll_ln = np.sum(stats.lognorm.logpdf(au, sig_h, 0, np.exp(mu_h)))
+aic_ln = 2 * 2 - 2 * ll_ln
+print(f"AIC pure log-normal (full data) = {aic_ln:.2f}")
+print(f"AIC LNP (body+tail, 4 params)   = {2 * 4 - 2 * (-res.fun):.2f}")
+
+# ============================================================
+# 3) LNP DENSITY PLOT
+# ============================================================
+xs = np.logspace(np.log10(au.min() * 0.8), np.log10(au.max() * 1.5), 400)
+w_body = (au < u_h).mean()
+cdf_u = stats.lognorm.cdf(u_h, sig_h, 0, np.exp(mu_h))
+pdf_body = w_body * stats.lognorm.pdf(xs, sig_h, 0, np.exp(mu_h)) / cdf_u
+w_tail = (au >= u_h).mean()
+pdf_tail = w_tail * stats.pareto.pdf(xs, alpha_h, scale=u_h)
+pdf_body[xs >= u_h] = 0
+pdf_tail[xs < u_h] = 0
+
+fig, ax = plt.subplots(figsize=(8, 5))
+ax.hist(
+    au, bins=30, density=True, alpha=0.45, color="gray", edgecolor="k", label="data"
+)
+ax.plot(xs, pdf_body, "b-", lw=2, label=f"LN body (μ={mu_h:.2f}, σ={sig_h:.2f})")
+ax.plot(xs, pdf_tail, "r-", lw=2, label=f"Pareto tail (α={alpha_h:.2f})")
+ax.axvline(u_h, color="k", ls=":", label=f"u={u_h:.2f} Moz")
+ax.set_xscale("log")
+ax.set_xlabel("Au (Moz, log scale)")
+ax.set_ylabel("density")
+ax.set_title("Combined log-normal + Pareto (LNP) model")
+ax.legend()
+plt.tight_layout()
+plt.savefig("lnp_model.png", dpi=300)
+plt.close()
+
+# ============================================================
+# 4) BOOTSTRAP CI FOR THE LNP PARAMETERS
+# ============================================================
+print("\n" + "=" * 65)
+print("4) Bootstrap CIs for LNP parameters (B=500)")
+print("=" * 65)
+B2 = 500
+boot_lnp = np.full((B2, 4), np.nan)
+for b in range(B2):
+    s = rng.choice(au, size=n, replace=True)
+    try:
+        r = optimize.minimize(
+            lnp_nll, res.x, args=(s,), method="L-BFGS-B", bounds=bounds
+        )
+        if r.success:
+            boot_lnp[b] = r.x
+    except Exception:
+        pass
+
+param_names = ["mu", "sigma", "alpha", "u"]
+for i, nm in enumerate(param_names):
+    lo, hi = ci(boot_lnp[:, i])
+    print(f"{nm:6s}: point={res.x[i]:.4f}  95% CI=[{lo:.4f}, {hi:.4f}]")
+
+# ============================================================
+# 5) TAIL PROBABILITY QUANTIFICATION
+# ============================================================
+print("\n" + "=" * 65)
+print("5) TAIL QUANTITIES (from fitted LNP)")
+print("=" * 65)
+for x_thr in [1, 5, 10, 20]:
+    if x_thr >= u_h:
+        p_cond = (u_h / x_thr) ** alpha_h
+        p_abs = w_tail * p_cond
+        print(
+            f"P(X > {x_thr:>2} Moz)  = {p_abs:.4f}  "
+            f"(expected # deposits ≈ {p_abs * n:.1f})"
+        )
+x_k = 17.481
+if x_k >= u_h:
+    p_k = w_tail * (u_h / x_k) ** alpha_h
+    print(f"\nP(X > Kisladag {x_k} Moz) = {p_k:.4f}  (~{p_k * n:.2f} deposits)")
+
+print("\nDone. Figure saved: lnp_model.png")
+
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+
