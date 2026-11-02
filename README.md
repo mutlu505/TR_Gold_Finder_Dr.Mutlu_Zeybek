@@ -1161,4 +1161,99 @@ print("\nDone. Figures written to working directory.")
 
 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
+import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+import pandas as pd
+
+# --- 1. Major gold deposits (name, lat, lon, approx. contained Au in Moz) ---
+deposits = [
+    # name, lat, lon, Moz
+    ("Muruntau", 41.52, 64.57, 170),
+    ("Grasberg", -4.05, 137.11, 110),
+    ("Pueblo Viejo", 18.90, -70.18, 41),
+    ("Carlin Trend", 40.90, -116.30, 90),
+    ("Kisladag", 38.50, 29.10, 17.5),
+    ("Copler", 39.50, 38.60, 6.0),
+    ("Yanacocha", -6.99, -78.51, 60),
+    ("Boddington", -32.72, 116.30, 20),
+    ("Golden Mile", -30.75, 121.47, 20),
+    ("Super Pit", -30.78, 121.50, 20),
+    ("Jiaodong (Linglong)", 37.40, 120.40, 80),
+    ("Olympic Dam", -30.45, 136.90, 30),
+    ("Oyu Tolgoi", 43.00, 106.80, 45),
+    ("Porgera", -5.47, 143.10, 20),
+    ("Lihir", -3.13, 152.63, 40),
+    ("Ashanti", 6.70, -1.60, 60),
+    ("Tarkwa", 5.30, -2.00, 30),
+    ("Sukari", 24.95, 34.70, 15),
+    ("Kumtor", 41.87, 78.20, 12),
+    ("Natalka", 61.60, 147.80, 30),
+    ("Donlin Creek", 62.00, -158.20, 45),
+    ("Pebble", 59.90, -155.30, 70),
+    ("Red Dog", 68.10, -162.80, 10),
+    ("Homestake", 44.35, -103.75, 40),
+    ("Round Mountain", 38.70, -117.10, 15),
+    ("Cortez", 40.20, -116.70, 30),
+    ("El Indio", -29.80, -70.00, 20),
+    ("Cerro Casale", -27.90, -69.60, 25),
+    ("Pascua-Lama", -29.30, -70.00, 20),
+    ("Veladero", -29.40, -70.00, 15),
+]
+
+df = pd.DataFrame(deposits, columns=["name", "lat", "lon", "moz"])
+
+# --- 2. Figure and map projection ---
+fig = plt.figure(figsize=(16, 9))
+ax = plt.axes(projection=ccrs.Robinson())
+ax.set_global()
+
+# --- 3. Basemap features ---
+ax.add_feature(cfeature.LAND, facecolor="0.95")
+ax.add_feature(cfeature.OCEAN, facecolor="aliceblue")
+ax.add_feature(cfeature.COASTLINE, linewidth=0.4)
+ax.add_feature(cfeature.BORDERS, linewidth=0.3, linestyle=":")
+ax.add_feature(cfeature.LAKES, facecolor="aliceblue", edgecolor="0.6", linewidth=0.2)
+
+# --- 4. Plot deposits (marker size ~ contained gold) ---
+sizes = 20 + df["moz"] * 4  # scale for visibility
+sc = ax.scatter(
+    df["lon"],
+    df["lat"],
+    s=sizes,
+    c=df["moz"],
+    cmap="YlOrRd",
+    edgecolor="black",
+    linewidth=0.6,
+    alpha=0.9,
+    transform=ccrs.PlateCarree(),
+    zorder=5,
+)
+
+# --- 5. Labels for the largest deposits ---
+for _, row in df.iterrows():
+    if row["moz"] >= 40:
+        ax.text(
+            row["lon"] + 2,
+            row["lat"] + 1.5,
+            row["name"],
+            transform=ccrs.PlateCarree(),
+            fontsize=7,
+            ha="left",
+            va="bottom",
+            bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.7),
+            zorder=6,
+        )
+
+# --- 6. Colorbar and title ---
+cbar = plt.colorbar(
+    sc, ax=ax, orientation="horizontal", pad=0.05, shrink=0.5, aspect=40
+)
+cbar.set_label("Contained gold (Moz, approx.)", fontsize=10)
+
+ax.set_title("Major Gold Deposits of the World", fontsize=14, pad=12)
+
+plt.tight_layout()
+plt.savefig("world_gold_deposits.png", dpi=300, bbox_inches="tight")
+plt.show()
 
